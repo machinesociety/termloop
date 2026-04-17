@@ -4,7 +4,7 @@ import json
 from functools import lru_cache
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -22,6 +22,12 @@ class ProviderConfig(BaseModel):
     small_model: str = DEFAULT_DASHSCOPE_MODELS["small_model"]
     medium_model: str = DEFAULT_DASHSCOPE_MODELS["medium_model"]
     large_model: str = DEFAULT_DASHSCOPE_MODELS["large_model"]
+
+    @model_validator(mode="after")
+    def validate_key_source(self) -> "ProviderConfig":
+        if self.api_key.lower().startswith("file:"):
+            raise ValueError("Provider api_key must come from env vars, not file paths.")
+        return self
 
 
 class Settings(BaseSettings):

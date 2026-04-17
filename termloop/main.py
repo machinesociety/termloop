@@ -4,6 +4,7 @@ from fastapi import FastAPI, HTTPException
 
 from .config import get_settings
 from .models import ChatCompletionRequest
+from .providers.openai_compatible import ProviderRequestError
 from .service import TermloopService
 
 
@@ -22,8 +23,11 @@ async def health() -> dict[str, str]:
 async def chat_completions(request: ChatCompletionRequest) -> dict:
     if not service.providers:
         raise HTTPException(status_code=503, detail="No providers configured")
-    response = await service.chat_completions(request)
-    return response.model_dump(mode="json")
+    try:
+        response = await service.chat_completions(request)
+        return response.model_dump(mode="json")
+    except ProviderRequestError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 @app.get("/v1/models")

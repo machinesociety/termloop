@@ -15,6 +15,7 @@ Please report security issues privately before disclosing them publicly.
 ## Operational guidance
 
 - Store upstream API keys in environment variables or a secrets manager.
+- Never store API keys in committed source code, request payload templates, or plaintext files tracked by git.
 - Do not commit credentials or provider tokens into the repository.
 - Review provider base URLs before enabling custom endpoints.
-
+- Rotate credentials immediately if they are ever pasted in chat, logs, screenshots, or shared terminals.

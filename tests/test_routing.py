@@ -19,3 +19,21 @@ def test_route_hard_task_to_large_model() -> None:
     assert route.model == "big"
     assert route.tier == "large"
 
+
+def test_route_explicit_model_priority() -> None:
+    request = ChatCompletionRequest(
+        model="mid",
+        messages=[ChatMessage(role="user", content="summarize this quickly")],
+    )
+    route = route_request(request, {"small": "mini", "medium": "mid", "large": "big"})
+    assert route.model == "mid"
+    assert route.tier == "medium"
+
+
+def test_route_tools_increase_complexity() -> None:
+    request = ChatCompletionRequest(
+        messages=[ChatMessage(role="user", content="find an implementation path")],
+        tools=[{"type": "function", "function": {"name": "search_docs"}}],
+    )
+    route = route_request(request, {"small": "mini", "medium": "mid", "large": "big"})
+    assert route.tier in {"medium", "large"}

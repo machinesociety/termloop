@@ -10,9 +10,22 @@ def test_compression_keeps_recent_messages() -> None:
         ChatMessage(role="user", content="final question"),
     ]
 
-    result = compress_messages(messages, target_chars=1200)
+    result = compress_messages(
+        messages,
+        target_chars=1200,
+        max_context_chars=1200,
+        min_preserve_turns=2,
+    )
 
     assert result.compressed is True
     assert result.messages[-1].content == "final question"
     assert result.messages[0].role == "system"
 
+
+def test_compression_skips_when_under_max_context() -> None:
+    messages = [
+        ChatMessage(role="system", content="policy"),
+        ChatMessage(role="user", content="short request"),
+    ]
+    result = compress_messages(messages, target_chars=100, max_context_chars=1000, min_preserve_turns=2)
+    assert result.compressed is False

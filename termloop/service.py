@@ -133,11 +133,15 @@ class TermloopService:
 
         rag_hits: list[str] = []
         if len(prompt_text) > self.settings.rag_trigger_chars:
-            for chunk in self.rag.search(prompt_text):
+            for chunk in self.rag.search(
+                prompt_text,
+                limit=self.settings.rag_max_hits,
+                min_score=self.settings.rag_min_score,
+            ):
                 rag_hits.append(chunk.text)
             if not rag_hits:
                 stored = self.rag.add_text(f"{provider_name}:{route.model}", prompt_text)
-                rag_hits = [chunk.text for chunk in stored[:2]]
+                rag_hits = [chunk.text for chunk in stored[: self.settings.rag_max_hits]]
 
         cache_payload = self._cache_payload(
             request,
@@ -161,6 +165,7 @@ class TermloopService:
                 "route_reason": route.reason,
                 "compressed": compressed_request.compressed,
                 "rag_hits": rag_hits,
+                "rag_hit_count": len(rag_hits),
                 "cache_hit": False,
                 "demo_mode": True,
             }
@@ -180,6 +185,7 @@ class TermloopService:
             "route_reason": route.reason,
             "compressed": compressed_request.compressed,
             "rag_hits": rag_hits,
+            "rag_hit_count": len(rag_hits),
             "cache_hit": False,
         }
         self.cache.set(cache_payload, response)

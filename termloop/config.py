@@ -46,6 +46,8 @@ class Settings(BaseSettings):
     compression_target_chars: int = 5000
     compression_min_preserve_turns: int = 4
     rag_trigger_chars: int = 6000
+    rag_min_score: float = 0.1
+    rag_max_hits: int = 3
 
     def provider_map(self) -> dict[str, ProviderConfig]:
         raw: dict[str, Any] = json.loads(self.providers or "{}")

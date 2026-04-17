@@ -8,18 +8,28 @@ from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+DEFAULT_DASHSCOPE_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+DEFAULT_DASHSCOPE_MODELS = {
+    "small_model": "qwen-turbo",
+    "medium_model": "qwen-plus",
+    "large_model": "qwen-max",
+}
+
+
 class ProviderConfig(BaseModel):
     api_key: str = ""
     base_url: str = ""
-    small_model: str = "gpt-4o-mini"
-    medium_model: str = "gpt-4.1-mini"
-    large_model: str = "gpt-4.1"
+    small_model: str = DEFAULT_DASHSCOPE_MODELS["small_model"]
+    medium_model: str = DEFAULT_DASHSCOPE_MODELS["medium_model"]
+    large_model: str = DEFAULT_DASHSCOPE_MODELS["large_model"]
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="TERMLOOP_", extra="ignore")
 
     providers: str = Field(default="{}")
+    dashscope_api_key: str = ""
+    dashscope_base_url: str = DEFAULT_DASHSCOPE_BASE_URL
     host: str = "0.0.0.0"
     port: int = 8000
     cache_dir: str = ".termloop/cache"
@@ -30,6 +40,17 @@ class Settings(BaseSettings):
 
     def provider_map(self) -> dict[str, ProviderConfig]:
         raw: dict[str, Any] = json.loads(self.providers or "{}")
+        if not raw:
+            raw["dashscope"] = {}
+
+        dashscope = raw.setdefault("dashscope", {})
+        dashscope.setdefault("base_url", self.dashscope_base_url)
+        dashscope.setdefault("small_model", DEFAULT_DASHSCOPE_MODELS["small_model"])
+        dashscope.setdefault("medium_model", DEFAULT_DASHSCOPE_MODELS["medium_model"])
+        dashscope.setdefault("large_model", DEFAULT_DASHSCOPE_MODELS["large_model"])
+        if self.dashscope_api_key:
+            dashscope["api_key"] = self.dashscope_api_key
+
         return {name: ProviderConfig(**config) for name, config in raw.items()}
 
 

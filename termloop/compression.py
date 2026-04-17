@@ -12,8 +12,15 @@ class CompressionResult:
     compressed: bool
 
 
-def compress_messages(messages: list[ChatMessage], target_chars: int) -> CompressionResult:
+def compress_messages(
+    messages: list[ChatMessage],
+    target_chars: int,
+    max_context_chars: int,
+    min_preserve_turns: int = 4,
+) -> CompressionResult:
     if not messages:
+        return CompressionResult(messages=messages, summary=None, compressed=False)
+    if target_chars <= 0:
         return CompressionResult(messages=messages, summary=None, compressed=False)
 
     system_messages = [message for message in messages if message.role == "system"]
@@ -23,7 +30,7 @@ def compress_messages(messages: list[ChatMessage], target_chars: int) -> Compres
         for message in conversation
     ]
     total = sum(size for _, size in sized)
-    if total <= target_chars:
+    if total <= max_context_chars:
         return CompressionResult(messages=messages, summary=None, compressed=False)
 
     kept: list[ChatMessage] = []
@@ -34,6 +41,8 @@ def compress_messages(messages: list[ChatMessage], target_chars: int) -> Compres
             kept_chars += size
 
     kept = list(reversed(kept))
+    if len(kept) < min_preserve_turns and conversation:
+        kept = conversation[-min_preserve_turns:]
     if not kept and conversation:
         kept = [conversation[-1]]
 
@@ -47,6 +56,8 @@ def compress_messages(messages: list[ChatMessage], target_chars: int) -> Compres
         if isinstance(item.content, str) and item.content.strip():
             summary_bits.append(f"{item.role}: {item.content.strip()[:240]}")
     summary = " | ".join(summary_bits)[:target_chars]
+    if not summary.strip():
+        return CompressionResult(messages=messages, summary=None, compressed=False)
     summary_message = ChatMessage(role="system", content=f"Compressed memory: {summary}")
     return CompressionResult(
         messages=[*system_messages, summary_message, *kept],

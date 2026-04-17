@@ -117,7 +117,12 @@ class TermloopService:
         client: OpenAICompatibleProvider = entry["client"]
         models = self._provider_models(provider)
         route = route_request(request, models)
-        compressed_request = compress_messages(request.messages, self.settings.compression_target_chars)
+        compressed_request = compress_messages(
+            request.messages,
+            target_chars=self.settings.compression_target_chars,
+            max_context_chars=self.settings.max_context_chars,
+            min_preserve_turns=self.settings.compression_min_preserve_turns,
+        )
         prompt_text = "\n".join(
             message.content if isinstance(message.content, str) else "" for message in compressed_request.messages
         )

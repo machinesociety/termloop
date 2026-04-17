@@ -42,6 +42,7 @@ class Settings(BaseSettings):
     rag_dir: str = ".termloop/rag"
     max_context_chars: int = 12000
     compression_target_chars: int = 5000
+    compression_min_preserve_turns: int = 4
     rag_trigger_chars: int = 6000
 
     def provider_map(self) -> dict[str, ProviderConfig]:

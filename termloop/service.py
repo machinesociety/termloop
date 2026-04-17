@@ -26,7 +26,11 @@ def _usage(prompt_text: str, completion_text: str) -> dict[str, int]:
 class TermloopService:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
-        self.cache = CacheStore(settings.cache_dir)
+        self.cache = CacheStore(
+            settings.cache_dir,
+            enabled=settings.cache_enabled,
+            ttl_seconds=settings.cache_ttl_seconds,
+        )
         self.rag = RagStore(settings.rag_dir)
         self.providers = self._build_providers(settings)
 
@@ -144,6 +148,8 @@ class TermloopService:
         )
         cached = self.cache.get(cache_payload)
         if cached:
+            cached.setdefault("termloop", {})
+            cached["termloop"]["cache_hit"] = True
             return ChatCompletionResponse(**cached)
 
         if not provider.api_key or not provider.base_url:
@@ -155,6 +161,7 @@ class TermloopService:
                 "route_reason": route.reason,
                 "compressed": compressed_request.compressed,
                 "rag_hits": rag_hits,
+                "cache_hit": False,
                 "demo_mode": True,
             }
             self.cache.set(cache_payload, payload)
@@ -173,6 +180,7 @@ class TermloopService:
             "route_reason": route.reason,
             "compressed": compressed_request.compressed,
             "rag_hits": rag_hits,
+            "cache_hit": False,
         }
         self.cache.set(cache_payload, response)
         return ChatCompletionResponse(**response)

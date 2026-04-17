@@ -39,6 +39,8 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
     cache_dir: str = ".termloop/cache"
+    cache_enabled: bool = True
+    cache_ttl_seconds: int = 600
     rag_dir: str = ".termloop/rag"
     max_context_chars: int = 12000
     compression_target_chars: int = 5000

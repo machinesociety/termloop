@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ChatMessage(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     role: Literal["system", "user", "assistant", "tool"]
     content: str | list[Any] | None = None
     name: str | None = None
@@ -13,6 +15,8 @@ class ChatMessage(BaseModel):
 
 
 class ChatCompletionRequest(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     model: str | None = None
     messages: list[ChatMessage] = Field(default_factory=list)
     temperature: float | None = None
@@ -33,6 +37,8 @@ class ChatCompletionChoice(BaseModel):
 
 
 class ChatCompletionResponse(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     id: str
     object: str = "chat.completion"
     created: int
@@ -40,4 +46,3 @@ class ChatCompletionResponse(BaseModel):
     choices: list[ChatCompletionChoice]
     usage: dict[str, int] | None = None
     termloop: dict[str, Any] = Field(default_factory=dict)
-

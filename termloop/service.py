@@ -44,6 +44,19 @@ class TermloopService:
             raise RuntimeError("No providers configured")
         return next(iter(self.providers.items()))
 
+    def _selected_provider(self, request: ChatCompletionRequest) -> tuple[str, dict[str, Any]]:
+        requested_model = (request.model or "").strip()
+        if requested_model:
+            for name, entry in self.providers.items():
+                provider: ProviderConfig = entry["config"]
+                if requested_model in {
+                    provider.small_model,
+                    provider.medium_model,
+                    provider.large_model,
+                }:
+                    return name, entry
+        return self._default_provider()
+
     def _provider_models(self, provider: ProviderConfig) -> dict[str, str]:
         return {
             "small": provider.small_model,
@@ -51,8 +64,16 @@ class TermloopService:
             "large": provider.large_model,
         }
 
-    def _cache_payload(self, request: ChatCompletionRequest, model: str, compressed: bool, rag_hits: list[str]) -> dict[str, Any]:
+    def _cache_payload(
+        self,
+        request: ChatCompletionRequest,
+        provider_name: str,
+        model: str,
+        compressed: bool,
+        rag_hits: list[str],
+    ) -> dict[str, Any]:
         return {
+            "provider": provider_name,
             "model": model,
             "messages": [message.model_dump(mode="json") for message in request.messages],
             "temperature": request.temperature,
@@ -91,7 +112,7 @@ class TermloopService:
         )
 
     async def chat_completions(self, request: ChatCompletionRequest) -> ChatCompletionResponse:
-        provider_name, entry = self._default_provider()
+        provider_name, entry = self._selected_provider(request)
         provider: ProviderConfig = entry["config"]
         client: OpenAICompatibleProvider = entry["client"]
         models = self._provider_models(provider)
@@ -111,6 +132,7 @@ class TermloopService:
 
         cache_payload = self._cache_payload(
             request,
+            provider_name,
             route.model,
             compressed_request.compressed,
             rag_hits,
@@ -119,19 +141,33 @@ class TermloopService:
         if cached:
             return ChatCompletionResponse(**cached)
 
-        if request.stream:
-            response = await client.chat_completions(
-                {
-                    **request.model_dump(exclude_none=True),
-                    "model": route.model,
-                    "messages": [message.model_dump(exclude_none=True) for message in compressed_request.messages],
-                }
-            )
-            self.cache.set(cache_payload, response)
-            return ChatCompletionResponse(**response)
+        if not provider.api_key or not provider.base_url:
+            response = self._chat_summary(request, route.model, rag_hits, compressed_request.compressed)
+            payload = response.model_dump(mode="json")
+            payload["termloop"] = {
+                "provider": provider_name,
+                "route_tier": route.tier,
+                "route_reason": route.reason,
+                "compressed": compressed_request.compressed,
+                "rag_hits": rag_hits,
+                "demo_mode": True,
+            }
+            self.cache.set(cache_payload, payload)
+            return ChatCompletionResponse(**payload)
 
-        response = self._chat_summary(request, route.model, rag_hits, compressed_request.compressed)
-        payload = response.model_dump(mode="json")
-        self.cache.set(cache_payload, payload)
-        return response
-
+        upstream_payload = {
+            **request.model_dump(exclude_none=True),
+            "model": route.model,
+            "stream": False,
+            "messages": [message.model_dump(exclude_none=True) for message in compressed_request.messages],
+        }
+        response = await client.chat_completions(upstream_payload)
+        response["termloop"] = {
+            "provider": provider_name,
+            "route_tier": route.tier,
+            "route_reason": route.reason,
+            "compressed": compressed_request.compressed,
+            "rag_hits": rag_hits,
+        }
+        self.cache.set(cache_payload, response)
+        return ChatCompletionResponse(**response)

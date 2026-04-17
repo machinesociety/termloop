@@ -25,3 +25,17 @@ async def chat_completions(request: ChatCompletionRequest) -> dict:
     response = await service.chat_completions(request)
     return response.model_dump(mode="json")
 
+
+@app.get("/v1/models")
+async def list_models() -> dict:
+    models: list[dict[str, str]] = []
+    for provider_name, entry in service.providers.items():
+        provider = entry["config"]
+        models.extend(
+            [
+                {"id": provider.small_model, "object": "model", "owned_by": provider_name, "tier": "small"},
+                {"id": provider.medium_model, "object": "model", "owned_by": provider_name, "tier": "medium"},
+                {"id": provider.large_model, "object": "model", "owned_by": provider_name, "tier": "large"},
+            ]
+        )
+    return {"object": "list", "data": models}

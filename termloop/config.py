@@ -4,11 +4,11 @@ import json
 from functools import lru_cache
 from typing import Any
 
-from pydantic import Field
+from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class ProviderConfig(BaseSettings):
+class ProviderConfig(BaseModel):
     api_key: str = ""
     base_url: str = ""
     small_model: str = "gpt-4o-mini"
@@ -36,4 +36,3 @@ class Settings(BaseSettings):
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     return Settings()
-

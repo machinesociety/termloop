@@ -49,6 +49,11 @@ def _text(request: ChatCompletionRequest) -> str:
 def route_request(request: ChatCompletionRequest, provider_models: dict[str, str]) -> RouteDecision:
     content = _text(request)
     length = len(content)
+    requested_model = (request.model or "").strip()
+    if requested_model:
+        for tier, model in provider_models.items():
+            if requested_model == model:
+                return RouteDecision(tier, model, "explicit model request")
     hints_small = sum(1 for hint in SMALL_TASK_HINTS if hint in content)
     hints_hard = sum(1 for hint in HARD_TASK_HINTS if hint in content)
 
@@ -57,4 +62,3 @@ def route_request(request: ChatCompletionRequest, provider_models: dict[str, str
     if hints_small > 0 or length < 1200:
         return RouteDecision("small", provider_models["small"], "simple task or short prompt")
     return RouteDecision("medium", provider_models["medium"], "default balanced routing")
-

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from .models import ChatCompletionRequest
 
 
-SMALL_TASK_HINTS = {
+SMALL_TASK_HINTS = (
     "classify",
     "classification",
     "summarize",
@@ -16,9 +16,20 @@ SMALL_TASK_HINTS = {
     "extract",
     "tag",
     "label",
-}
+    "format",
+    "grammar",
+)
 
-HARD_TASK_HINTS = {
+MEDIUM_TASK_HINTS = (
+    "compare",
+    "analyze",
+    "explain",
+    "draft",
+    "review",
+    "calculate",
+)
+
+HARD_TASK_HINTS = (
     "prove",
     "reason",
     "plan",
@@ -28,7 +39,10 @@ HARD_TASK_HINTS = {
     "refactor",
     "safety",
     "risk",
-}
+    "root cause",
+    "tradeoff",
+    "threat model",
+)
 
 
 @dataclass(frozen=True)
@@ -54,11 +68,21 @@ def route_request(request: ChatCompletionRequest, provider_models: dict[str, str
         for tier, model in provider_models.items():
             if requested_model == model:
                 return RouteDecision(tier, model, "explicit model request")
-    hints_small = sum(1 for hint in SMALL_TASK_HINTS if hint in content)
-    hints_hard = sum(1 for hint in HARD_TASK_HINTS if hint in content)
 
-    if hints_hard > 0 or length > 8000:
-        return RouteDecision("large", provider_models["large"], "hard reasoning or long prompt")
-    if hints_small > 0 or length < 1200:
-        return RouteDecision("small", provider_models["small"], "simple task or short prompt")
-    return RouteDecision("medium", provider_models["medium"], "default balanced routing")
+    small_score = sum(1 for hint in SMALL_TASK_HINTS if hint in content)
+    medium_score = sum(1 for hint in MEDIUM_TASK_HINTS if hint in content)
+    hard_score = sum(2 for hint in HARD_TASK_HINTS if hint in content)
+    if request.tools:
+        hard_score += 2
+    if length > 7000:
+        hard_score += 2
+    elif length > 2500:
+        medium_score += 1
+    else:
+        small_score += 1
+
+    if hard_score >= max(3, medium_score + 1):
+        return RouteDecision("large", provider_models["large"], "high complexity intent or tool context")
+    if small_score >= max(2, hard_score):
+        return RouteDecision("small", provider_models["small"], "lightweight task intent")
+    return RouteDecision("medium", provider_models["medium"], "balanced task complexity")

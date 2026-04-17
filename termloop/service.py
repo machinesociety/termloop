@@ -7,6 +7,7 @@ from uuid import uuid4
 from .cache import CacheStore
 from .compression import compress_messages
 from .config import ProviderConfig, Settings
+from .metrics import MetricsStore
 from .models import ChatCompletionChoice, ChatCompletionRequest, ChatCompletionResponse, ChatMessage
 from .rag import RagStore
 from .routing import route_request
@@ -32,6 +33,7 @@ class TermloopService:
             ttl_seconds=settings.cache_ttl_seconds,
         )
         self.rag = RagStore(settings.rag_dir)
+        self.metrics = MetricsStore()
         self.providers = self._build_providers(settings)
 
     def _build_providers(self, settings: Settings) -> dict[str, dict[str, Any]]:
@@ -154,6 +156,7 @@ class TermloopService:
         if cached:
             cached.setdefault("termloop", {})
             cached["termloop"]["cache_hit"] = True
+            self.metrics.record_request(route.tier, cache_hit=True, rag_hit_count=len(rag_hits))
             return ChatCompletionResponse(**cached)
 
         if not provider.api_key or not provider.base_url:
@@ -170,6 +173,7 @@ class TermloopService:
                 "demo_mode": True,
             }
             self.cache.set(cache_payload, payload)
+            self.metrics.record_request(route.tier, cache_hit=False, rag_hit_count=len(rag_hits))
             return ChatCompletionResponse(**payload)
 
         upstream_payload = {
@@ -189,4 +193,5 @@ class TermloopService:
             "cache_hit": False,
         }
         self.cache.set(cache_payload, response)
+        self.metrics.record_request(route.tier, cache_hit=False, rag_hit_count=len(rag_hits))
         return ChatCompletionResponse(**response)

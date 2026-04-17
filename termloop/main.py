@@ -43,3 +43,8 @@ async def list_models() -> dict:
             ]
         )
     return {"object": "list", "data": models}
+
+
+@app.get("/v1/metrics/summary")
+async def metrics_summary() -> dict:
+    return {"object": "termloop.metrics", "data": service.metrics.summary()}
